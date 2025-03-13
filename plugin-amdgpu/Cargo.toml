@@ -15,6 +15,7 @@ humantime-serde = "1.1.1"
 notify = "6.1.1"
 base64 = "0.22.1"
 regex = "1.11.1"
+amdsmi = { git = "https://github.com/ROCm/amdsmi.git" }
 
 [lints]
 workspace = true
