@@ -13,14 +13,15 @@ pub struct Probe {
     pub energy: TypedMetricId<f64>,
     /// Metric type based on GPU electric power consumption data.
     pub power: TypedMetricId<u64>,
-    /// Metric type based on GPU total RAM memory data.
-    pub memory_total: TypedMetricId<u64>,
     /// Metric type based on GPU used RAM memory data.
-    pub memory_used: TypedMetricId<u64>,
+    pub vram_used: TypedMetricId<u64>,
+    /// Metric type based on GPU used GTT memory data.
+    pub gtt_used: TypedMetricId<u64>,
 }
 
 impl Source for Probe {
     fn poll(&mut self, measurement: &mut MeasurementAccumulator, timestamp: Timestamp) -> Result<(), PollError> {
+        let consumer = ResourceConsumer::LocalMachine;
         let metric = create_metric();
 
         // GPU energy consumption metric pushed
@@ -28,7 +29,7 @@ impl Source for Probe {
             timestamp,
             self.energy,
             Resource::LocalMachine,
-            ResourceConsumer::LocalMachine,
+            consumer,
             metric.energy,
         );
         measurement.push(ergy);
@@ -38,28 +39,28 @@ impl Source for Probe {
             timestamp,
             self.power,
             Resource::LocalMachine,
-            ResourceConsumer::LocalMachine,
+            consumer,
             metric.power,
         );
         measurement.push(pwr);
 
-        // GPU total RAM memory metric pushed
+        // GPU used RAM memory metric pushed
         let mem_tot: MeasurementPoint = MeasurementPoint::new(
             timestamp,
-            self.memory_total,
+            self.vram_used,
             Resource::LocalMachine,
-            ResourceConsumer::LocalMachine,
-            metric.memory_total,
+            consumer,
+            metric.vram_used,
         );
         measurement.push(mem_tot);
 
-        // GPU used RAM memory metric pushed
+        // GPU used GTT memory metric pushed
         let mem_use: MeasurementPoint = MeasurementPoint::new(
             timestamp,
-            self.memory_used,
+            self.gtt_used,
             Resource::LocalMachine,
-            ResourceConsumer::LocalMachine,
-            metric.memory_used,
+            consumer,
+            metric.gtt_used,
         );
         measurement.push(mem_use);
 

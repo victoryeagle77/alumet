@@ -59,15 +59,15 @@ impl AlumetPlugin for AMDGPUPlugin {
                 Unit::Watt,
                 "Get GPU electric power consumption in Watt",
             )?,
-            memory_total: alumet.create_metric::<u64>(
-                "amd_gpu_total_memory",
-                mb.clone(),
-                "Get GPU total RAM memory in MB",
-            )?,
-            memory_used: alumet.create_metric::<u64>(
-                "amd_gpu_used_memory",
+            vram_used: alumet.create_metric::<u64>(
+                "amd_gpu_used_vram_memory",
                 mb.clone(),
                 "Get GPU used RAM memory in MB",
+            )?,
+            gtt_used: alumet.create_metric::<u64>(
+                "amd_gpu_used_gtt_memory",
+                mb.clone(),
+                "Get GPU used Graphic Table Translation memory in MB",
             )?,
         };
 
@@ -75,7 +75,7 @@ impl AlumetPlugin for AMDGPUPlugin {
         let trigger = trigger::builder::time_interval(self.config.poll_interval).build()?;
 
         // Add the source to the measurement pipeline
-        alumet.add_source(Box::new(source), trigger);
+        alumet.add_source("AMDGPU", Box::new(source), trigger);
 
         Ok(())
     }
