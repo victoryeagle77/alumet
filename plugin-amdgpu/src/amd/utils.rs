@@ -3,20 +3,20 @@ use log::{error, info, warn};
 
 pub struct Metric {
     /// GPU energy consumption.
-    pub energy: Option<f64>,
+    pub energy: f64,
     /// GPU electric power consumption.
-    pub power: Option<u64>,
+    pub power: u64,
     /// GPU used RAM memory.
-    pub vram_used: Option<u64>,
+    pub vram_used: u64,
     /// GPU used GTT memory.
-    pub gtt_used: Option<u64>,
+    pub gtt_used: u64,
 }
 
-/// Shutdown the AMD SMI library
-fn amdsmi_exit() {
+/// Shutdown the AMD SMI library.
+fn exit_amdsmi() {
     match amdsmi_shut_down() {
         Ok(_) => info!("AMD SMI shut down successfully"),
-        Err(e) => panic!("Failed to shut down AMD SMI: {e}"),
+        Err(e) => error!("Failed to shut down AMD SMI: {e}"),
     }
 }
 
@@ -24,14 +24,17 @@ fn create_metric() -> Metric {
     // Initialize the AMD SMI library
     match amdsmi_init(AmdsmiInitFlagsT::AmdsmiInitAmdGpus) {
         Ok(_) => info!("AMD SMI initialized successfully"),
-        Err(e) => panic!("Failed to initialize AMD SMI: {e}"),
+        Err(e) => { 
+            error!("Failed to initialize AMD SMI: {e}");
+            return;
+        }
     }
 
     // Get socket handles
     let socket_handles = match amdsmi_get_socket_handles() {
         Ok(handles) => handles,
         Err(e) => {
-            panic!("Failed to get socket handles: {e}");
+            error!("Failed to get socket handles: {e}");
             amdsmi_exit();
             return;
         }
@@ -53,7 +56,7 @@ fn create_metric() -> Metric {
                 Ok(data) => data,
                 Err(e) => {
                     error!("Failed to get GPU ID: {e}");
-                    None;
+                    0;
                 }
             };
 
@@ -82,7 +85,7 @@ fn create_metric() -> Metric {
             };
 
             // Get GPU VRAM memory usage in MB
-            let vram_usage: u64 = match amdsmi_get_gpu_memory_usage(processor_handle, AmdsmiMemoryTypeT::AmdsmiMemTypeVram) {
+            let vram_used = match amdsmi_get_gpu_memory_usage(processor_handle, AmdsmiMemoryTypeT::AmdsmiMemTypeVram) {
                 Ok(data) => (data / 1e6),
                 Err(e) => {
                     error!("Failed to get GPU memory usage: {e}");
@@ -90,7 +93,7 @@ fn create_metric() -> Metric {
                 }
             };
             // Get GPU GTT memory usage in MB
-            let gtt_usage: u64 = match amdsmi_get_gpu_memory_usage(processor_handle, AmdsmiMemoryTypeT::AmdsmiMemTypeGtt) {
+            let gtt_used = match amdsmi_get_gpu_memory_usage(processor_handle, AmdsmiMemoryTypeT::AmdsmiMemTypeGtt) {
                 Ok(data) => (data / 1e6),
                 Err(e) => {
                     error!("Failed to get GPU memory usage: {e}");
@@ -99,23 +102,54 @@ fn create_metric() -> Metric {
             };
 
             // Get GPU current temperature metric by hardware sectors
-            let sensor_type = AmdsmiTemperatureTypeT::AmdsmiTemperatureTypeEdge;
+            let sensor_type = [
+                AmdsmiTemperatureTypeT::AmdsmiTemperatureTypeEdge,
+                AmdsmiTemperatureTypeT::AmdsmiTemperatureTypeHotspot,
+                AmdsmiTemperatureTypeT::AmdsmiTemperatureTypeVram,
+                AmdsmiTemperatureTypeT::AmdsmiTemperatureTypeHbm0,
+                AmdsmiTemperatureTypeT::AmdsmiTemperatureTypeHbm1,
+                AmdsmiTemperatureTypeT::AmdsmiTemperatureTypeHbm2,
+                AmdsmiTemperatureTypeT::AmdsmiTemperatureTypeHbm3,
+                AmdsmiTemperatureTypeT::AmdsmiTemperatureTypePlx,
+            ];
             let metric = AmdsmiTemperatureMetricT::AmdsmiTempCurrent;
-            match amdsmi_get_temp_metric(processor_handle, sensor_type, metric) {
-                Ok(data) => {
-                    let temperature = data;
+            let temperature = match amdsmi_get_temp_metric(processor_handle, sensor_type[0], metric) {
+                Ok(data) => data as u64,
+                Err(e) => {
+                    error!("Failed to get GPU temperature metric: {e}");
+                    None
                 }
-                Err(e) => error!("Failed to get GPU temperature metric: {e}"),
-            }
+            };
+
+            // Get GPU current clock metric by hardware sectors
+            let clk_type = [
+                AmdsmiClkTypeT::AmdsmiClkTypeSys,
+                AmdsmiClkTypeT::AmdsmiClkTypeDf,
+                AmdsmiClkTypeT::AmdsmiClkTypeDcef,
+                AmdsmiClkTypeT::AmdsmiClkTypeSoc,
+                AmdsmiClkTypeT::AmdsmiClkTypeMem,
+                AmdsmiClkTypeT::AmdsmiClkTypePcie,
+                AmdsmiClkTypeT::AmdsmiClkTypeVclk0,
+                AmdsmiClkTypeT::AmdsmiClkTypeVclk1,
+                AmdsmiClkTypeT::AmdsmiClkTypeDclk0,
+                AmdsmiClkTypeT::AmdsmiClkTypeDclk1,
+            ];
+            let clk = match amdsmi_get_clk_freq(processor_handle, clk_type[0]) {
+                Ok(data) => data.current,
+                Err(e) => {
+                    error!("Failed to get clock frequencies: {e}"); 
+                    None
+                }
+            };
         }
     }
 
-    amdsmi_exit();
+    exit_amdsmi();
 
     Metric {
         energy,
         power,
-        vram_used: vram_usage,
-        gtt_used: gtt_usage,
+        vram_used,
+        gtt_used,
     }
 }

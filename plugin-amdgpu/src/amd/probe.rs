@@ -25,44 +25,33 @@ impl Source for Probe {
         let metric = create_metric();
 
         // GPU energy consumption metric pushed
-        let ergy = MeasurementPoint::new(
-            timestamp,
-            self.energy,
-            Resource::LocalMachine,
-            consumer,
-            metric.energy,
-        );
+        let ergy = MeasurementPoint::new(timestamp, self.energy, Resource::LocalMachine, consumer, metric.energy);
         measurement.push(ergy);
 
         // GPU electric power consumption metric pushed
-        let pwr: MeasurementPoint = MeasurementPoint::new(
-            timestamp,
-            self.power,
-            Resource::LocalMachine,
-            consumer,
-            metric.power,
-        );
+        let pwr: MeasurementPoint =
+            MeasurementPoint::new(timestamp, self.power, Resource::LocalMachine, consumer, metric.power);
         measurement.push(pwr);
 
         // GPU used RAM memory metric pushed
-        let mem_tot: MeasurementPoint = MeasurementPoint::new(
+        let vram_use: MeasurementPoint = MeasurementPoint::new(
             timestamp,
             self.vram_used,
             Resource::LocalMachine,
             consumer,
             metric.vram_used,
         );
-        measurement.push(mem_tot);
+        measurement.push(vram_use);
 
         // GPU used GTT memory metric pushed
-        let mem_use: MeasurementPoint = MeasurementPoint::new(
+        let gtt_use: MeasurementPoint = MeasurementPoint::new(
             timestamp,
             self.gtt_used,
             Resource::LocalMachine,
             consumer,
             metric.gtt_used,
         );
-        measurement.push(mem_use);
+        measurement.push(gtt_use);
 
         Ok(())
     }
