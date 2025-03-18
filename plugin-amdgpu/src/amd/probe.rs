@@ -21,16 +21,26 @@ pub struct Probe {
 
 impl Source for Probe {
     fn poll(&mut self, measurement: &mut MeasurementAccumulator, timestamp: Timestamp) -> Result<(), PollError> {
-        let consumer = ResourceConsumer::LocalMachine;
         let metric = create_metric();
 
         // GPU energy consumption metric pushed
-        let ergy = MeasurementPoint::new(timestamp, self.energy, Resource::LocalMachine, consumer, metric.energy);
+        let ergy = MeasurementPoint::new(
+            timestamp,
+            self.energy,
+            Resource::LocalMachine,
+            ResourceConsumer::LocalMachine,
+            metric.energy,
+        );
         measurement.push(ergy);
 
         // GPU electric power consumption metric pushed
-        let pwr: MeasurementPoint =
-            MeasurementPoint::new(timestamp, self.power, Resource::LocalMachine, consumer, metric.power);
+        let pwr: MeasurementPoint = MeasurementPoint::new(
+            timestamp,
+            self.power,
+            Resource::LocalMachine,
+            ResourceConsumer::LocalMachine,
+            metric.power,
+        );
         measurement.push(pwr);
 
         // GPU used RAM memory metric pushed
@@ -38,7 +48,7 @@ impl Source for Probe {
             timestamp,
             self.vram_used,
             Resource::LocalMachine,
-            consumer,
+            ResourceConsumer::LocalMachine,
             metric.vram_used,
         );
         measurement.push(vram_use);
@@ -48,7 +58,7 @@ impl Source for Probe {
             timestamp,
             self.gtt_used,
             Resource::LocalMachine,
-            consumer,
+            ResourceConsumer::LocalMachine,
             metric.gtt_used,
         );
         measurement.push(gtt_use);

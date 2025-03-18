@@ -1,5 +1,5 @@
 use amdsmi::*;
-use log::{error, info, warn};
+use log::{error, info};
 
 pub struct Metric {
     /// GPU energy consumption.
@@ -20,11 +20,11 @@ fn exit_amdsmi() {
     }
 }
 
-fn create_metric() -> Metric {
+pub fn create_metric() -> Metric {
     // Initialize the AMD SMI library
     match amdsmi_init(AmdsmiInitFlagsT::AmdsmiInitAmdGpus) {
         Ok(_) => info!("AMD SMI initialized successfully"),
-        Err(e) => { 
+        Err(e) => {
             error!("Failed to initialize AMD SMI: {e}");
             return;
         }
@@ -35,7 +35,7 @@ fn create_metric() -> Metric {
         Ok(handles) => handles,
         Err(e) => {
             error!("Failed to get socket handles: {e}");
-            amdsmi_exit();
+            exit_amdsmi();
             return;
         }
     };
@@ -56,48 +56,51 @@ fn create_metric() -> Metric {
                 Ok(data) => data,
                 Err(e) => {
                     error!("Failed to get GPU ID: {e}");
-                    0;
+                    return 0;
                 }
             };
 
             // Get GPU energy consumption in Joules
             let energy = match amdsmi_get_energy_count(processor_handle) {
-                Ok((energy_accumulator, counter_resolution, _)) => (energy_accumulator * counter_resolution) / 1e3,
+                Ok((energy_accumulator, counter_resolution, _)) => {
+                    (energy_accumulator as f64 * counter_resolution as f64) / 1e3
+                }
                 Err(e) => {
                     error!("Failed to get energy count: {e}");
-                    None;
+                    return 0.0;
                 }
             };
 
             // Get average power consumption GPU in Watts
-            let power = match amdsmi_get_power_info(processor_handle, sensor_ind) {
+            let power = match amdsmi_get_power_info(processor_handle) {
                 Ok(data) => data.average_socket_power as u64,
                 Err(e) => {
                     error!("Failed to get power information: {e}");
-                    None;
+                    return 0;
                 }
             };
-            match amdsmi_get_power_cap_info(processor_handle, 0) {
-                Ok(data) => {
-                    let power_test = data.power_cap;
+            let power_test = match amdsmi_get_power_cap_info(processor_handle, 0) {
+                Ok(data) => data.power_cap,
+                Err(e) => {
+                    error!("Failed to get power cap information: {e}");
+                    return 0;
                 }
-                Err(e) => panic!("Failed to get power cap information: {e}"),
             };
 
             // Get GPU VRAM memory usage in MB
             let vram_used = match amdsmi_get_gpu_memory_usage(processor_handle, AmdsmiMemoryTypeT::AmdsmiMemTypeVram) {
-                Ok(data) => (data / 1e6),
+                Ok(data) => data / 1_000_000,
                 Err(e) => {
                     error!("Failed to get GPU memory usage: {e}");
-                    None;
+                    return 0;
                 }
             };
             // Get GPU GTT memory usage in MB
             let gtt_used = match amdsmi_get_gpu_memory_usage(processor_handle, AmdsmiMemoryTypeT::AmdsmiMemTypeGtt) {
-                Ok(data) => (data / 1e6),
+                Ok(data) => data / 1_000_000,
                 Err(e) => {
                     error!("Failed to get GPU memory usage: {e}");
-                    None;
+                    return 0;
                 }
             };
 
@@ -117,7 +120,7 @@ fn create_metric() -> Metric {
                 Ok(data) => data as u64,
                 Err(e) => {
                     error!("Failed to get GPU temperature metric: {e}");
-                    None
+                    return 0;
                 }
             };
 
@@ -137,8 +140,8 @@ fn create_metric() -> Metric {
             let clk = match amdsmi_get_clk_freq(processor_handle, clk_type[0]) {
                 Ok(data) => data.current,
                 Err(e) => {
-                    error!("Failed to get clock frequencies: {e}"); 
-                    None
+                    error!("Failed to get clock frequencies: {e}");
+                    return 0;
                 }
             };
         }
