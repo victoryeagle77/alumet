@@ -75,7 +75,7 @@ impl AlumetPlugin for AMDGPUPlugin {
         let trigger = trigger::builder::time_interval(self.config.poll_interval).build()?;
 
         // Add the source to the measurement pipeline
-        alumet.add_source("AMDGPU", Box::new(source), trigger);
+        alumet.add_source("amdgpu", Box::new(source), trigger);
 
         Ok(())
     }
