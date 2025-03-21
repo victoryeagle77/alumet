@@ -46,9 +46,13 @@ impl AlumetPlugin for AMDGPUPlugin {
     }
 
     fn start(&mut self, alumet: &mut AlumetPluginStart) -> anyhow::Result<()> {
-        let mb = PrefixedUnit::mega(Unit::Byte);
         // Create the source
         let source = Probe {
+            clock: alumet.create_metric::<u64>(
+                "amd_gpu_clock_frequency",
+                PrefixedUnit::mega(Unit::Hertz),
+                "Get GPU clock frequency in Mhz",
+            )?,
             energy: alumet.create_metric::<f64>(
                 "amd_gpu_energy_consumption",
                 Unit::Joule,
@@ -59,14 +63,19 @@ impl AlumetPlugin for AMDGPUPlugin {
                 Unit::Watt,
                 "Get GPU electric power consumption in Watt",
             )?,
+            temperature: alumet.create_metric::<u64>(
+                "amd_gpu_temperature",
+                Unit::DegreeCelsius,
+                "Get GPU temperature in °C",
+            )?,
             vram_used: alumet.create_metric::<u64>(
                 "amd_gpu_used_vram_memory",
-                mb.clone(),
+                PrefixedUnit::mega(Unit::Byte),
                 "Get GPU used RAM memory in MB",
             )?,
             gtt_used: alumet.create_metric::<u64>(
                 "amd_gpu_used_gtt_memory",
-                mb.clone(),
+                PrefixedUnit::mega(Unit::Byte),
                 "Get GPU used Graphic Table Translation memory in MB",
             )?,
         };
