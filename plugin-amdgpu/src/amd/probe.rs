@@ -14,78 +14,100 @@ pub struct Probe {
     /// Metric type based on GPU energy consumption data.
     pub energy: TypedMetricId<f64>,
     /// Metric type based on GPU electric power consumption data.
-    pub power: TypedMetricId<u64>,
+    pub power_average: TypedMetricId<u64>,
     /// Metric type based on GPU temperature data.
     pub temperature: TypedMetricId<u64>,
-    /// Metric type based on GPU used RAM memory data.
-    pub vram_used: TypedMetricId<u64>,
     /// Metric type based on GPU used GTT memory data.
-    pub gtt_used: TypedMetricId<u64>,
+    pub memory_gtt_usage: TypedMetricId<u64>,
+    /// Metric type based on GPU used VRAM memory data.
+    pub memory_vram_usage: TypedMetricId<u64>,
+    /// Metric type base on GPU
+    pub count_compute_process: TypedMetricId<u64>,
 }
 
 impl Source for Probe {
     fn poll(&mut self, measurement: &mut MeasurementAccumulator, timestamp: Timestamp) -> Result<(), PollError> {
         let metric = create_metric();
+        let id = metric.id;
 
-        // GPU clock frequency metric pushed
-        let clk = MeasurementPoint::new(
-            timestamp,
-            self.clock,
-            Resource::Gpu { bus_id: "0".into() },
-            ResourceConsumer::LocalMachine,
-            metric.clock,
-        );
-        measurement.push(clk);
+        // GPU clock frequencies metrics pushed
+        for (_i, clock) in metric.clocks.iter().enumerate() {
+            measurement.push(MeasurementPoint::new(
+                timestamp,
+                self.clock,
+                Resource::Gpu {
+                    bus_id: id.clone().into(),
+                },
+                ResourceConsumer::LocalMachine,
+                *clock,
+            ));
+        }
 
         // GPU energy consumption metric pushed
-        let ergy = MeasurementPoint::new(
+        measurement.push(MeasurementPoint::new(
             timestamp,
             self.energy,
-            Resource::Gpu { bus_id: "0".into() },
+            Resource::Gpu {
+                bus_id: id.clone().into(),
+            },
             ResourceConsumer::LocalMachine,
             metric.energy,
-        );
-        measurement.push(ergy);
+        ));
 
-        // GPU electric power consumption metric pushed
-        let pwr = MeasurementPoint::new(
+        // GPU electric average power consumption metric pushed
+        measurement.push(MeasurementPoint::new(
             timestamp,
-            self.power,
-            Resource::Gpu { bus_id: "0".into() },
+            self.power_average,
+            Resource::Gpu {
+                bus_id: id.clone().into(),
+            },
             ResourceConsumer::LocalMachine,
-            metric.power,
-        );
-        measurement.push(pwr);
+            metric.power_average,
+        ));
 
-        // GPU temperature metric pushed
-        let tmp = MeasurementPoint::new(
-            timestamp,
-            self.temperature,
-            Resource::Gpu { bus_id: "0".into() },
-            ResourceConsumer::LocalMachine,
-            metric.temperature,
-        );
-        measurement.push(tmp);
+        // GPU temperatures metrics pushed
+        for (_i, temperature) in metric.temperatures.iter().enumerate() {
+            measurement.push(MeasurementPoint::new(
+                timestamp,
+                self.temperature,
+                Resource::Gpu {
+                    bus_id: id.clone().into(),
+                },
+                ResourceConsumer::LocalMachine,
+                *temperature,
+            ));
+        }
 
-        // GPU used RAM memory metric pushed
-        let vram_use = MeasurementPoint::new(
+        // GPU GTT memory used metrics pushed
+        measurement.push(MeasurementPoint::new(
             timestamp,
-            self.vram_used,
-            Resource::Gpu { bus_id: "0".into() },
+            self.memory_gtt_usage,
+            Resource::Gpu {
+                bus_id: id.clone().into(),
+            },
             ResourceConsumer::LocalMachine,
-            metric.vram_used,
-        );
-        measurement.push(vram_use);
+            metric.memory_gtt_usage,
+        ));
 
-        // GPU used GTT memory metric pushed
-        let gtt_use = MeasurementPoint::new(
+        // GPU VRAM memory used metrics pushed
+        measurement.push(MeasurementPoint::new(
             timestamp,
-            self.gtt_used,
-            Resource::Gpu { bus_id: "0".into() },
+            self.memory_vram_usage,
+            Resource::Gpu {
+                bus_id: id.clone().into(),
+            },
             ResourceConsumer::LocalMachine,
-            metric.gtt_used,
-        );
-        measurement.push(gtt_use);
+            metric.memory_vram_usage,
+        ));
+
+        // GPU compute processes counter metric pushed
+        measurement.push(MeasurementPoint::new(
+            timestamp,
+            self.count_compute_process,
+            Resource::LocalMachine,
+            ResourceConsumer::LocalMachine,
+            metric.counter_compute_process,
+        ));
 
         Ok(())
     }

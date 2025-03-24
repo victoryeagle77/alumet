@@ -58,25 +58,30 @@ impl AlumetPlugin for AMDGPUPlugin {
                 Unit::Joule,
                 "Get GPU energy consumption in Joules",
             )?,
-            power: alumet.create_metric::<u64>(
-                "amd_gpu_power_consumption",
+            power_average: alumet.create_metric::<u64>(
+                "amd_gpu_power_average_consumption",
                 Unit::Watt,
-                "Get GPU electric power consumption in Watt",
+                "Get GPU electric average power consumption in Watt",
             )?,
             temperature: alumet.create_metric::<u64>(
                 "amd_gpu_temperature",
                 Unit::DegreeCelsius,
                 "Get GPU temperature in °C",
             )?,
-            vram_used: alumet.create_metric::<u64>(
-                "amd_gpu_used_vram_memory",
+            memory_gtt_usage: alumet.create_metric::<u64>(
+                "amd_gpu_memory_gtt_usage",
                 PrefixedUnit::mega(Unit::Byte),
-                "Get GPU used RAM memory in MB",
+                "Get GPU used GTT memory in MB",
             )?,
-            gtt_used: alumet.create_metric::<u64>(
-                "amd_gpu_used_gtt_memory",
+            memory_vram_usage: alumet.create_metric::<u64>(
+                "amd_gpu_memory_vram_usage",
                 PrefixedUnit::mega(Unit::Byte),
-                "Get GPU used Graphic Table Translation memory in MB",
+                "Get GPU used VRAM memory in MB",
+            )?,
+            count_compute_process: alumet.create_metric::<u64>(
+                "amd_gpu_count_compute_process",
+                Unit::Unity,
+                "Get GPU compute processes number",
             )?,
         };
 
@@ -84,7 +89,7 @@ impl AlumetPlugin for AMDGPUPlugin {
         let trigger = trigger::builder::time_interval(self.config.poll_interval).build()?;
 
         // Add the source to the measurement pipeline
-        alumet.add_source("amdgpu", Box::new(source), trigger);
+        let _ = alumet.add_source("amdgpu", Box::new(source), trigger);
 
         Ok(())
     }
