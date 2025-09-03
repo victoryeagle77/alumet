@@ -40,14 +40,12 @@ impl AmdGpuDevices {
     /// If `skip_failed_devices` is `true`, ignore inaccessible GPUs. Some fatal errors will still make the function return early with an error.
     /// If `skip_failed_devices` is `false`, returns an error on the first device that fails.
     pub fn detect(skip_failed_devices: bool) -> anyhow::Result<AmdGpuDevices> {
-        let socket_handles = amdsmi_get_socket_handles().map_err(AmdError)?;
         let mut devices: HashMap<String, ManagedDevice> = HashMap::new();
         let mut failure_count = 0;
 
-        for socket_handle in socket_handles {
+        for socket_handle in amdsmi_get_socket_handles().map_err(AmdError)? {
             // Get processor handles for each socket handle
-            let handles = amdsmi_get_processor_handles(socket_handle).map_err(AmdError)?;
-            for handle in handles {
+            for handle in amdsmi_get_processor_handles(socket_handle).map_err(AmdError)? {
                 match OptionalFeatures::with_detected_features(handle) {
                     Ok((gpu, features)) => {
                         let bus_id = amdsmi_get_gpu_device_bdf(gpu)
@@ -81,6 +79,7 @@ impl AmdGpuDevices {
         }
         let mut devices: Vec<ManagedDevice> = devices.into_values().collect();
         devices.sort_by_key(|device| device.bus_id.clone());
+
         Ok(AmdGpuDevices { devices, failure_count })
     }
 

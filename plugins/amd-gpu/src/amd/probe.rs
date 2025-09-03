@@ -92,7 +92,7 @@ impl Source for AmdGpuSource {
                 self.metrics.gpu_power_consumption,
                 self.resource.clone(),
                 consumer.clone(),
-                value.current_socket_power as u64,
+                value.average_socket_power as u64,
             ));
         }
 
