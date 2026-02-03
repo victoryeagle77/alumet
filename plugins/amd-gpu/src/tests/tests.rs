@@ -1,19 +1,18 @@
-use std::{sync::Arc, thread::sleep, time::Duration};
-
 use crate::{
-    AmdError, AmdGpuPlugin, Config,
+    AmdGpuPlugin, Config,
     amd::utils::{
         METRIC_LABEL_ACTIVITY, METRIC_LABEL_ENERGY, METRIC_LABEL_MEMORY, METRIC_LABEL_POWER, METRIC_LABEL_PROCESS_CPU,
         METRIC_LABEL_PROCESS_ENCODE, METRIC_LABEL_PROCESS_GFX, METRIC_LABEL_PROCESS_GTT, METRIC_LABEL_PROCESS_MEMORY,
         METRIC_LABEL_PROCESS_VRAM, METRIC_LABEL_TEMPERATURE, METRIC_LABEL_VOLTAGE, METRIC_TEMP, PLUGIN_NAME,
         UNEXPECTED_DATA, UNKNOWN_ERROR,
     },
-    interface::{MockAmdSmiTrait, MockProcessorHandleTrait, MockSocketHandleTrait},
     tests::mocks::{
         MOCK_ACTIVITY, MOCK_ENERGY, MOCK_MEMORY, MOCK_POWER, MOCK_PROCESS, MOCK_SOURCE_NAME, MOCK_TEMPERATURE,
         MOCK_UUID, MOCK_VOLTAGE,
     },
 };
+use amd_smi_lib::{AmdError, MockAmdSmiTrait, MockProcessorHandleTrait, MockSocketHandleTrait};
+use std::{sync::Arc, thread::sleep, time::Duration};
 
 use alumet::{
     agent::{
@@ -38,40 +37,36 @@ fn config_to_toml_table(config: &Config) -> toml::Table {
 fn test_start_success() {
     let mut mock_init = MockAmdSmiTrait::new();
 
-    mock_init.expect_get_socket_handles().returning(|| {
+    mock_init.expect_socket_handles().returning(|| {
         let mut mock_socket = MockSocketHandleTrait::new();
-        mock_socket.expect_get_processor_handles().returning(|| {
+        mock_socket.expect_processor_handles().returning(|| {
             let mut mock_processor = MockProcessorHandleTrait::new();
 
             mock_processor
-                .expect_get_device_uuid()
+                .expect_device_uuid()
                 .returning(|| Ok(MOCK_UUID.to_owned()));
 
-            mock_processor
-                .expect_get_device_activity()
-                .returning(|| Ok(MOCK_ACTIVITY));
+            mock_processor.expect_device_activity().returning(|| Ok(MOCK_ACTIVITY));
 
             mock_processor
-                .expect_get_device_energy_consumption()
+                .expect_device_energy_consumption()
                 .returning(|| Ok(MOCK_ENERGY));
 
             mock_processor
-                .expect_get_device_power_consumption()
+                .expect_device_power_consumption()
                 .returning(|| Ok(MOCK_POWER));
 
-            mock_processor
-                .expect_get_device_power_managment()
-                .returning(|| Ok(true));
+            mock_processor.expect_device_power_managment().returning(|| Ok(true));
 
             mock_processor
-                .expect_get_device_process_list()
+                .expect_device_process_list()
                 .returning(|| Ok(vec![MOCK_PROCESS]));
 
             mock_processor
-                .expect_get_device_voltage()
+                .expect_device_voltage()
                 .returning(|_, _| Ok(MOCK_VOLTAGE));
 
-            mock_processor.expect_get_device_memory_usage().returning(|mem_type| {
+            mock_processor.expect_device_memory_usage().returning(|mem_type| {
                 MOCK_MEMORY
                     .iter()
                     .find(|(t, _)| *t == mem_type)
@@ -79,19 +74,17 @@ fn test_start_success() {
                     .unwrap_or(Err(AmdError(UNEXPECTED_DATA)))
             });
 
-            mock_processor
-                .expect_get_device_temperature()
-                .returning(|sensor, metric| {
-                    if metric != METRIC_TEMP {
-                        return Err(AmdError(UNEXPECTED_DATA));
-                    }
+            mock_processor.expect_device_temperature().returning(|sensor, metric| {
+                if metric != METRIC_TEMP {
+                    return Err(AmdError(UNEXPECTED_DATA));
+                }
 
-                    MOCK_TEMPERATURE
-                        .iter()
-                        .find(|(s, _)| *s == sensor)
-                        .map(|(_, v)| Ok(*v))
-                        .unwrap_or(Err(AmdError(UNEXPECTED_DATA)))
-                });
+                MOCK_TEMPERATURE
+                    .iter()
+                    .find(|(s, _)| *s == sensor)
+                    .map(|(_, v)| Ok(*v))
+                    .unwrap_or(Err(AmdError(UNEXPECTED_DATA)))
+            });
 
             Ok(vec![Box::new(mock_processor)])
         });
@@ -130,7 +123,7 @@ fn test_start_success() {
         || {},
         |ctx| {
             let m = ctx.measurements();
-            let get_metric = |name| ctx.metrics().by_name(name).unwrap().0;
+            let metric = |name| ctx.metrics().by_name(name).unwrap().0;
             let gpu_points = |metric| {
                 m.iter().filter(move |p| {
                     p.metric == metric
@@ -143,7 +136,7 @@ fn test_start_success() {
 
             // GPU activity usage
             {
-                let metric = get_metric(METRIC_LABEL_ACTIVITY);
+                let metric = metric(METRIC_LABEL_ACTIVITY);
                 let points: Vec<_> = gpu_points(metric).collect();
 
                 for p in points {
@@ -171,7 +164,7 @@ fn test_start_success() {
 
             // GPU memory usage
             {
-                let metric = get_metric(METRIC_LABEL_MEMORY);
+                let metric = metric(METRIC_LABEL_MEMORY);
                 let points: Vec<_> = gpu_points(metric).collect();
 
                 for p in points {
@@ -196,7 +189,7 @@ fn test_start_success() {
 
             // GPU temperatures
             {
-                let metric = get_metric(METRIC_LABEL_TEMPERATURE);
+                let metric = metric(METRIC_LABEL_TEMPERATURE);
                 let points: Vec<_> = gpu_points(metric).collect();
 
                 for p in points {
@@ -236,7 +229,7 @@ fn test_start_success() {
 
             // GPU energy consumption
             {
-                let metric = get_metric(METRIC_LABEL_ENERGY);
+                let metric = metric(METRIC_LABEL_ENERGY);
                 if let Some(p) = gpu_points(metric).next() {
                     assert_eq!(p.value, WrappedMeasurementValue::F64(MOCK_ENERGY.energy as f64));
                 }
@@ -244,14 +237,14 @@ fn test_start_success() {
 
             // GPU power consumption
             {
-                let metric = get_metric(METRIC_LABEL_POWER);
+                let metric = metric(METRIC_LABEL_POWER);
                 let p = gpu_points(metric).next().expect("Unexpected value");
                 assert_eq!(p.value, WrappedMeasurementValue::U64(MOCK_POWER.socket_power as u64));
             }
 
             // GPU voltage
             {
-                let metric = get_metric(METRIC_LABEL_VOLTAGE);
+                let metric = metric(METRIC_LABEL_VOLTAGE);
                 let p = gpu_points(metric).next().expect("Unexpected value");
                 assert_eq!(p.value, WrappedMeasurementValue::U64(MOCK_VOLTAGE as u64));
             }
@@ -269,7 +262,7 @@ fn test_start_success() {
                 ];
 
                 for &metric_id in &process_metrics {
-                    let metric = get_metric(metric_id);
+                    let metric = metric(metric_id);
                     let points: Vec<_> = gpu_points(metric).collect();
 
                     for p in points {
@@ -327,7 +320,7 @@ fn test_start_success() {
 #[test]
 fn test_start_error() {
     let mut mock_init = MockAmdSmiTrait::new();
-    mock_init.expect_get_socket_handles().returning(|| Ok(vec![]));
+    mock_init.expect_socket_handles().returning(|| Ok(vec![]));
     mock_init.expect_stop().returning(|| Ok(()));
 
     let mut plugins = PluginSet::new();
@@ -349,37 +342,37 @@ fn test_start_error() {
 fn test_start_success_without_stats() {
     let mut mock_init = MockAmdSmiTrait::new();
 
-    mock_init.expect_get_socket_handles().returning(|| {
+    mock_init.expect_socket_handles().returning(|| {
         let mut mock_socket = MockSocketHandleTrait::new();
-        mock_socket.expect_get_processor_handles().returning(|| {
+        mock_socket.expect_processor_handles().returning(|| {
             let mut mock_processor = MockProcessorHandleTrait::new();
             mock_processor
-                .expect_get_device_uuid()
+                .expect_device_uuid()
                 .returning(|| Ok(MOCK_UUID.to_owned()));
 
             mock_processor
-                .expect_get_device_activity()
+                .expect_device_activity()
                 .returning(|| Err(AmdError(UNKNOWN_ERROR)));
             mock_processor
-                .expect_get_device_energy_consumption()
+                .expect_device_energy_consumption()
                 .returning(|| Err(AmdError(UNKNOWN_ERROR)));
             mock_processor
-                .expect_get_device_power_consumption()
+                .expect_device_power_consumption()
                 .returning(|| Err(AmdError(UNKNOWN_ERROR)));
             mock_processor
-                .expect_get_device_power_managment()
+                .expect_device_power_managment()
                 .returning(|| Err(AmdError(UNKNOWN_ERROR)));
             mock_processor
-                .expect_get_device_process_list()
+                .expect_device_process_list()
                 .returning(|| Err(AmdError(UNKNOWN_ERROR)));
             mock_processor
-                .expect_get_device_voltage()
+                .expect_device_voltage()
                 .returning(|_, _| Err(AmdError(UNKNOWN_ERROR)));
             mock_processor
-                .expect_get_device_memory_usage()
+                .expect_device_memory_usage()
                 .returning(|_| Err(AmdError(UNKNOWN_ERROR)));
             mock_processor
-                .expect_get_device_temperature()
+                .expect_device_temperature()
                 .returning(|_, _| Err(AmdError(UNKNOWN_ERROR)));
 
             Ok(vec![Box::new(mock_processor)])
